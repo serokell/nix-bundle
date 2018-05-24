@@ -33,6 +33,7 @@ static void usage(const char *pname) {
     fprintf(stderr, "\t-m <src>:<src>\tmap src on the host to dest in the sandbox\n");
     fprintf(stderr, "\t-d\tdelete all default dir mappings, may break things\n");
     fprintf(stderr, "\t-p <var>\tpreserve the value of a variable across the -c clear\n");
+    fprintf(stderr, "\t-w <path>\ttry to cwd to <path> after chrooting\n");
 
     exit(EXIT_FAILURE);
 }
@@ -94,6 +95,7 @@ struct DirMapping parseMapping(string input) {
 int main(int argc, char *argv[]) {
   uint8_t clear_env = 0;
   char *nixdir = NULL;
+  const char *cwd = "/";
   list<struct DirMapping> dirMappings;
   list<struct SetEnv> envMappings;
   const char *t;
@@ -111,7 +113,7 @@ int main(int argc, char *argv[]) {
 #undef x
 
   int opt;
-  while ((opt = getopt(argc, argv, "cn:m:dp:")) != -1) {
+  while ((opt = getopt(argc, argv, "cn:m:dp:w:")) != -1) {
     switch (opt) {
     case 'c':
       clear_env = 1;
@@ -128,6 +130,9 @@ int main(int argc, char *argv[]) {
       break;
     case 'd':
       dirMappings.clear();
+      break;
+    case 'w':
+      cwd = optarg;
       break;
     case 'p':
       t = getenv(optarg);
@@ -218,7 +223,9 @@ int main(int argc, char *argv[]) {
     err_exit("chroot(%s)", rootdir);
   }
 
-  chdir("/");
+  if (chdir(cwd) != 0) {
+    chdir("/");
+  }
 
   if (clear_env) clearenv();
   setenv("PATH", ENV_PATH, 1);

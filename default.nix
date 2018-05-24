@@ -68,23 +68,24 @@ in rec {
       };
     };
 
-  makeStartup = { target, nixUserChrootFlags, nix-user-chroot', run }:
+  makeStartup = { target, nixUserChrootFlags, nix-user-chroot', run, workingDir ? "/", preStart ? "" }:
   writeScript "startup" ''
-.${nix-user-chroot'}/bin/nix-user-chroot -n ./nix ${nixUserChrootFlags} -- ${target}${run} $@
+${preStart}
+.${nix-user-chroot'}/bin/nix-user-chroot -n ./nix -w ${workingDir} ${nixUserChrootFlags} -- ${target}${run} $@
   '';
 
-  nix-bootstrap = { target, extraTargets ? [], run, nix-user-chroot' ? nix-user-chroot, nixUserChrootFlags ? "" }:
+  nix-bootstrap = { target, extraTargets ? [], run, nix-user-chroot' ? nix-user-chroot, nixUserChrootFlags ? "" , workingDir ? "/", preStart ? "" }:
     let
-      script = makeStartup { inherit target nixUserChrootFlags nix-user-chroot' run; };
+      script = makeStartup { inherit target nixUserChrootFlags nix-user-chroot' run workingDir preStart; };
     in makebootstrap {
       startup = ".${script} '\"$@\"'";
       targets = [ "${script}" ] ++ extraTargets;
     };
 
-  nix-bootstrap-nix = {target, run, extraTargets ? []}:
+  nix-bootstrap-nix = {target, run, extraTargets ? [], workingDir ? "/", nixUserChrootFlags ? "", preStart ? ""}:
     nix-bootstrap-path {
-      inherit target run;
-      extraTargets = [ gnutar bzip2 xz gzip coreutils bash ];
+      inherit target run workingDir nixUserChrootFlags preStart;
+      extraTargets = [ gnutar bzip2 xz gzip coreutils bash ] ++ extraTargets;
     };
 
   # special case adding path to the environment before launch
@@ -94,8 +95,8 @@ in rec {
       makeFlags = o.makeFlags ++ [
         ''ENV_PATH="${stdenv.lib.makeBinPath targets}"''
       ];
-    }); in { target, extraTargets ? [], run }: nix-bootstrap {
-      inherit target extraTargets run;
+    }); in { target, extraTargets ? [], run, workingDir ? "/", nixUserChrootFlags ? "", preStart ? "" }: nix-bootstrap {
+      inherit target extraTargets run workingDir nixUserChrootFlags preStart;
       nix-user-chroot' = nix-user-chroot'' extraTargets;
     };
 }
